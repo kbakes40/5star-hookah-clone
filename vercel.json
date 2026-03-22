@@ -1,34 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm vite build --config vite.vercel.config.ts && node_modules/.bin/esbuild server/_vercel_exports.ts --platform=node --packages=external --bundle --format=esm --outfile=api/_server.mjs",
-  "outputDirectory": "dist/public",
-  "installCommand": "pnpm install",
   "framework": null,
+  "installCommand": "pnpm install",
+  "buildCommand": "node scripts/build-manus-mirror.mjs",
+  "outputDirectory": "dist/public",
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/((?!api/|\\.well-known/).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/manus-assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 30,
-      "includeFiles": "api/_server.mjs"
-    }
-  }
+  ]
 }
