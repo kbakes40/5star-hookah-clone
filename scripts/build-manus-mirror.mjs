@@ -28,4 +28,4 @@ for (const route of routes) {
   cpSync(resolve(src, 'index.html'), resolve(dir, 'index.html'));
 }
 cpSync(resolve(src, 'index.html'), resolve(out, '404.html'));
-console.log('Built static Manus mirror to', out);
+console.log('Built static mirror to', out);
