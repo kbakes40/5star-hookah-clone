@@ -107,3 +107,4 @@ temp/
 *.sqlite3
 .vercel
 .env*.local
+.audit/
