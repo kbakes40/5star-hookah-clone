@@ -71,6 +71,13 @@
       "when": 1770685978678,
       "tag": "0009_peaceful_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1778877647399,
+      "tag": "0010_familiar_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

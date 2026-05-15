@@ -274,3 +274,73 @@ All other env vars (`TURSO_*`, `AUTHNET_*`, `GOOGLE_*`, `APPLE_*`, `NEXT_PUBLIC_
   tRPC actually serve (blocks any functional verification of the Auth.js wiring)
 - Vercel: working network + `vercel login` + confirm clean project under
   `kevin-7816s-projects`; Turso: `turso auth login` (browser authorize)
+
+---
+
+# AuthNet port complete — Agent 4
+
+> 2026-05-15. Ported the already-built Authorize.Net Accept.js integration from
+> the sibling fork `~/Websites/bosshookahclonethehookahshop` (read-only ref) into
+> this repo, adapted for the Drizzle order path. Stripe left fully in place.
+
+## Source audit — deltas between source fork and this repo
+
+| Aspect | Source fork (Supabase) | This repo (Drizzle) | Resolution |
+|---|---|---|---|
+| Order store | `supabaseAdmin → bh_orders` | Drizzle MySQL `orders` (lazy `getDb()`) | `chargeAuthNet` order-insert rewritten to mirror `createZelleOrder` |
+| `@shared/orderShippingAddress` | exists, used for billTo | **absent** | Dropped address normalization; minimal billTo from cardholder name + ZIP (matches the modal's `onCharge(nonce, billingZip)` contract) |
+| `@/lib/haptics` | exists (`triggerHaptic`) | **absent** | Removed the import + 2 call-sites from the modal (Step 6 "fix imports"; no visual/behaviour change) |
+| Plaid/PayPal procedures | present | absent | Not ported (out of scope; card-only) |
+| `ctx.user.id` | string (Supabase uid) | number (MySQL autoinc) | `userId: ctx.user?.id || 0`; AuthNet `customer.id` → `String(ctx.user.id)` |
+
+`server/authnet.ts` and `client/src/lib/acceptjs.ts` copied **verbatim**.
+`AuthNetCardModal.tsx` copied verbatim except the haptics import/calls.
+`ui/button`, `ui/input`, and `.brutalist-border/.brutalist-shadow`
+(`client/src/index.css`) all exist here → **zero visual/color change**.
+
+## Order-insert adaptation (Drizzle `orders`, mirrors Zelle)
+
+| Column | Value |
+|---|---|
+| `paymentMethod` | `'authnet'` |
+| `stripePaymentIntentId` | AuthNet `transId` (fallback: invoice number) — column reused, **not renamed** (Phase B) |
+| `stripeCheckoutSessionId` | invoice number `bh_<base36 time>` (mirrors Zelle stuffing pattern) |
+| `status` | `'paid'` · `fulfillmentStatus` `'pending'` |
+| `totalAmount` | **server-recomputed** from line items (client amount never trusted) |
+| `items` | `JSON.stringify(input.items)` · `shippingAddress` `null` · `userId` `ctx.user?.id||0` |
+
+Charge-succeeded-but-insert-failed path logs loudly with the transaction id and
+returns a "contact support" error (card was captured — must be reconcilable).
+
+## Enum widened (migration generated, NOT pushed)
+
+`drizzle/schema.ts`: `orders.paymentMethod` enum `["stripe","zelle"]` →
+`["stripe","zelle","authnet"]`. Migration **`drizzle/0010_familiar_ghost_rider.sql`**
+generated — single `ALTER TABLE orders MODIFY COLUMN paymentMethod` statement,
+nothing else. **Not applied** (needs MySQL `DATABASE_URL`; Phase B applies it).
+
+## Build / typecheck
+
+`pnpm run build` exits **0**. `pnpm check` = **53 errors = exact pre-port
+baseline** (the brief's "54" predates Agent 3's Option A fix). **Zero new tsc
+errors; none in any AuthNet-port file.**
+
+## GATED — needs Louis (not done; unsafe to do unilaterally)
+
+- **Step 9 — Vercel env vars (`vercel env add`).** Interactive; Louis pastes
+  real values. Needed (production + preview): `AUTHNET_API_LOGIN_ID`,
+  `AUTHNET_TRANSACTION_KEY`, `AUTHNET_SIGNATURE_KEY` (use the **regenerated**
+  one, not the screenshot-exposed key), `AUTHNET_PUBLIC_CLIENT_KEY`,
+  `AUTHNET_ENVIRONMENT=production`, plus client-exposed
+  `VITE_AUTHNET_API_LOGIN_ID`, `VITE_AUTHNET_PUBLIC_CLIENT_KEY`,
+  `VITE_AUTHNET_ENVIRONMENT=production`. NEVER expose
+  `AUTHNET_TRANSACTION_KEY`/`AUTHNET_SIGNATURE_KEY` to the client.
+- **Push / preview deploy / Step 12 end-to-end test.** Deliberately **NOT
+  pushed**. This branch's Vercel GitHub integration auto-deploys **Production**
+  on push and is currently broken (VERCEL_CONFIG_NOTES.md — stale-commit prod
+  deploys). Pushing untested payment code to a live tobacco merchant via a
+  misconfigured auto-deploy is unsafe. Order: Louis fixes Git/Production +
+  Deployment Protection → adds env vars → deploys → verifies with **Authorize.Net
+  portal Test Mode ON** (card `4111 1111 1111 1111`). Commit is local-only until then.
+- Stripe-removal brief + AuthNet webhook brief + Phase B data port remain
+  separate, after AuthNet is verified.

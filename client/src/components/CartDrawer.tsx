@@ -4,6 +4,7 @@
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import AuthNetCardModal from "./AuthNetCardModal";
 import { X, Minus, Plus, Trash2, Truck, Store } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -16,7 +17,26 @@ export default function CartDrawer() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState<"shipping" | "pickup">("shipping");
   const [paymentMethod, setPaymentMethod] = useState<"card" | "zelle" | "bitcoin" | "paypal">("card");
+  const [cardModalOpen, setCardModalOpen] = useState(false);
   const createCheckoutSession = trpc.checkout.createSession.useMutation();
+  const chargeAuthNet = trpc.checkout.chargeAuthNet.useMutation();
+  // Stripe createSession is intentionally retained but no longer wired to the
+  // Credit Card button (Authorize.Net handles cards now). The Stripe-removal
+  // brief deletes it later; keep the reference alive to avoid an unused-var error.
+  void createCheckoutSession;
+
+  const buildCheckoutItems = () =>
+    items.map(item => {
+      const itemName = item.selectedVariantName
+        ? `${item.brand} - ${item.name} - ${item.selectedVariantName}`
+        : `${item.brand} - ${item.name}`;
+      return {
+        name: itemName,
+        priceInCents: Math.round((item.salePrice || item.price) * 100),
+        quantity: item.quantity,
+        image: item.image,
+      };
+    });
 
   if (!isOpen) return null;
 
@@ -241,30 +261,11 @@ export default function CartDrawer() {
                     setIsCheckingOut(false);
                     return;
                   } else {
-                    // Stripe checkout
-                    const checkoutItems = items.map(item => {
-                      const itemName = item.selectedVariantName 
-                        ? `${item.brand} - ${item.name} - ${item.selectedVariantName}`
-                        : `${item.brand} - ${item.name}`;
-                      
-                      return {
-                        name: itemName,
-                        priceInCents: Math.round((item.salePrice || item.price) * 100),
-                        quantity: item.quantity,
-                        image: item.image,
-                      };
-                    });
-
-                    const session = await createCheckoutSession.mutateAsync({
-                      items: checkoutItems,
-                      deliveryMethod,
-                    });
-
-                    if (session.url) {
-                      toast.success("Redirecting to checkout...");
-                      window.open(session.url, "_blank");
-                      closeCart();
-                    }
+                    // Credit card — Authorize.Net Accept.js (opens card modal;
+                    // card data is tokenized client-side, never hits our server)
+                    setCardModalOpen(true);
+                    setIsCheckingOut(false);
+                    return;
                   }
                 } catch (error: any) {
                   if (error.message?.includes("login")) {
@@ -286,6 +287,30 @@ export default function CartDrawer() {
           </div>
         )}
       </div>
+
+      <AuthNetCardModal
+        open={cardModalOpen}
+        onClose={() => setCardModalOpen(false)}
+        totalLabel={`$${cartTotal.toFixed(2)}`}
+        onCharge={async (nonce, billingZip) => {
+          const r = await chargeAuthNet.mutateAsync({
+            opaqueDataDescriptor: nonce.dataDescriptor,
+            opaqueDataValue: nonce.dataValue,
+            billingZip,
+            items: buildCheckoutItems(),
+            deliveryMethod,
+          });
+          return {
+            orderId: String(r.orderId),
+            transactionId: r.transactionId,
+            accountLast4: r.accountLast4,
+          };
+        }}
+        onSuccess={() => {
+          clearCart();
+          closeCart();
+        }}
+      />
     </>
   );
 }

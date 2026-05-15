@@ -1,0 +1,1 @@
+ALTER TABLE `orders` MODIFY COLUMN `paymentMethod` enum('stripe','zelle','authnet') NOT NULL DEFAULT 'stripe';
