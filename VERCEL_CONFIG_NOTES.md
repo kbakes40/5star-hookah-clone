@@ -230,6 +230,43 @@ not 404), Louis must either:
 Not done here: changing a project-level security posture is outward-facing and
 outside this brief's authorization.
 
+---
+
+# UPDATE 2026-05-15 (2) — "Function Runtimes must have a valid version" RECURRENCE diagnosed
+
+**Symptom:** error keeps reappearing despite vercel.json being fixed.
+
+**Root cause (definitive, from build logs):** the Vercel **GitHub integration**
+(auto-connected by `vercel link`) is auto-deploying **Production** on push and
+building a **stale commit `380d6e0`** — the only commit that still contains
+`"functions": { "api/index.ts": { "runtime": "@vercel/node@5" } }`. Build log of
+prod deploy `lm7o16zn2`: `Cloning … Commit: 380d6e0 … Error: Function Runtimes
+must have a valid version`.
+
+**Current code is correct.** HEAD `ca33f3d` vercel.json has **no functions
+block**. Deploys of current code are **READY**: `nukpq2fvk`, `k2xiw2bgz`, and
+auto-Preview `f29qb8xh7`/`9j861pbrd`/`ha0kdcs3r`. No further vercel.json change
+will help — the problem is the Git integration, not the config.
+
+**Two hard-stop collisions caused by the auto-connected Git integration:**
+1. It deploys to **Production** on push (`dyk96eqxp`, `lm7o16zn2` — both Error/
+   Production). Brief hard stop: "Do NOT deploy to production. Preview only."
+2. It rebuilds stale commit `380d6e0`, regenerating the runtime error.
+
+**Resolution — LOUIS ONLY (Vercel dashboard; project Git/production settings are
+out of agent scope per "cutover is Louis-only"):**
+- Project → Settings → **Git**: either disconnect the GitHub integration, OR set
+  **Production Branch** to `main` (so pushes to `feat/authnet-replace-stripe`
+  create Preview, not Production), OR add an Ignored Build Step.
+- Do NOT "Redeploy" the old `380d6e0`/`dyk96eqxp`/`nzdneyps6`/`lm7o16zn2`
+  deployments — they rebuild the stale bad commit. Use latest (`ca33f3d`).
+- Until the Git setting is fixed, **do not push to this branch** — each push
+  spawns another failed Production deploy and reproduces the error. (This
+  diagnosis commit is intentionally committed locally but NOT pushed for that
+  reason.)
+- Deployment Protection still ON → Phase 6 curl still returns 401 on all paths
+  (unchanged; separate from this issue).
+
 ## Outstanding for cutover (Louis)
 
 - **Resolve the `api/_server.mjs` BLOCKER** (pick Option A or B above) so the
