@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // Import from pre-compiled server bundle (built by esbuild during Vercel build)
-import { appRouter, createContext, stripe, handleWebhookEvent, ENV, authHandler } from "./_server.mjs";
+import { appRouter, createContext, stripe, handleWebhookEvent, ENV, authHandler } from "../server/_vercel_exports";
 
 const app = express();
 
