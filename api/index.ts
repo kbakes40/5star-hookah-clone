@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // Import from pre-compiled server bundle (built by esbuild during Vercel build)
-import { appRouter, createContext, stripe, handleWebhookEvent, ENV } from "./_server.mjs";
+import { appRouter, createContext, stripe, handleWebhookEvent, ENV, authHandler } from "./_server.mjs";
 
 const app = express();
 
@@ -30,6 +30,10 @@ app.post(
     }
   }
 );
+
+// Auth.js (Phase A scaffolding) — before express.json() so POST
+// signin/signout/csrf bodies reach @auth/core raw. Additive only.
+app.all("/api/auth/*", authHandler);
 
 // Configure body parser
 app.use(express.json({ limit: "50mb" }));

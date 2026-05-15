@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // Manus OAuth removed - using Supabase auth
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { authHandler } from "../auth";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -60,6 +61,11 @@ async function startServer() {
     }
   );
   
+  // Auth.js (Phase A scaffolding) — MUST be before express.json() so POST
+  // signin/signout/csrf bodies reach @auth/core raw. Purely additive; the
+  // Supabase tRPC session check in context.ts is untouched (Phase B swap).
+  app.all("/api/auth/*", authHandler);
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
